@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mini Casino — Blackjack & Poker (Client-side)</title>
+  <style>
+    :root{--card-w:80px;--card-h:120px;--green:#0b6a2d}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;margin:0;background:linear-gradient(180deg,#0b6a2d 0%,#064b21 100%);color:#fff}
+    .wrap{max-width:1100px;margin:24px auto;padding:20px;background:rgba(0,0,0,0.35);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+    h1{margin:0;font-size:20px}
+    nav{display:flex;gap:8px}
+    button.tab{background:#063f1b;border:1px solid rgba(255,255,255,0.06);padding:8px 14px;border-radius:8px;color:#e6ffe8;cursor:pointer}
+    button.tab.active{background:#fff;color:#063f1b}
+    .topbar{display:flex;gap:12px;align-items:center}
+    .balance, .bet{background:rgba(255,255,255,0.06);padding:8px 12px;border-radius:8px}
+
+    .game{margin-top:18px}
+    .board{display:flex;gap:24px}
+    .column{flex:1}
+
+    .controls{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    .controls input[type=number]{width:90px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#fff}
+    button.btn{padding:8px 12px;border-radius:8px;border:none;background:#0a8f47;color:#fff;cursor:pointer}
+    button.btn.gray{background:#2f4a38}
+
+    .table{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.05));padding:18px;border-radius:10px}
+
+    .hand{display:flex;gap:10px;align-items:flex-end}
+
+    /* card style */
+    .card{width:var(--card-w);height:var(--card-h);border-radius:8px;background:#fff;color:#000;display:flex;flex-direction:column;justify-content:space-between;padding:8px;box-shadow:0 6px 12px rgba(0,0,0,0.35);font-weight:600}
+    .card .top, .card .bottom{font-size:14px}
+    .card .center{font-size:32px;text-align:center}
+    .card.red{color:#d22}
+    .card.back{background:linear-gradient(135deg,#0b6a2d,#064b21);color:#fff;align-items:center;justify-content:center}
+
+    .small{font-size:13px;opacity:0.9}
+    .status{margin-top:8px;font-weight:700}
+
+    /* poker holds */
+    .hold{display:block;margin-top:6px;padding:6px;border-radius:6px;background:rgba(255,255,255,0.06);cursor:pointer;text-align:center}
+    .hold.active{background:#ffd94d;color:#000}
+
+    footer{margin-top:18px;font-size:13px;opacity:0.9}
+
+    /* responsive */
+    @media (max-width:900px){.board{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Mini Casino — Blackjack & Poker (Client-side)</h1>
+        <div class="small">Client-only demo. No real money. Follow local laws. For demo and testing only.</div>
+      </div>
+      <div class="topbar">
+        <div class="balance">Balance: <span id="balance">1000</span> chips</div>
+        <div class="bet">Current Bet: <span id="currentBet">10</span></div>
+        <nav>
+          <button class="tab active" data-target="blackjack">Blackjack</button>
+          <button class="tab" data-target="poker">Poker (5-card draw)</button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="game">
+      <!-- Blackjack -->
+      <section id="blackjack" class="table" style="display:block">
+        <div class="controls">
+          <label>Bet: <input id="bj-bet" type="number" min="1" value="10"></label>
+          <button id="bj-deal" class="btn">Deal</button>
+          <button id="bj-hit" class="btn gray" disabled>Hit</button>
+          <button id="bj-stand" class="btn gray" disabled>Stand</button>
+          <button id="bj-double" class="btn gray" disabled>Double</button>
+          <div class="status" id="bj-status"></div>
+        </div>
+
+        <div class="board">
+          <div class="column">
+            <h3>Dealer</h3>
+            <div class="hand" id="dealer-hand"></div>
+          </div>
+          <div class="column">
+            <h3>You</h3>
+            <div class="hand" id="player-hand"></div>
+            <div class="small">Hand value: <span id="player-value">0</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Poker -->
+      <section id="poker" class="table" style="display:none">
+        <div class="controls">
+          <label>Bet: <input id="pkr-bet" type="number" min="1" value="5"></label>
+          <button id="pkr-deal" class="btn">Deal</button>
+          <button id="pkr-draw" class="btn gray" disabled>Draw</button>
+          <div class="status" id="pkr-status"></div>
+        </div>
+
+        <div>
+          <div class="small">Payouts (example): Royal/straight flush 250x, Four-kind 25x, Full house 9x, Flush 6x, Straight 4x, Three-kind 3x, Two pair 2x, Pair (Jacks or better) 1x</div>
+        </div>
+
+        <div class="board">
+          <div class="column">
+            <h3>Your Hand</h3>
+            <div class="hand" id="pkr-hand"></div>
+          </div>
+          <div class="column">
+            <h3>Result</h3>
+            <div id="pkr-result" class="small"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer>
+      <div>Instructions: Blackjack supports Hit, Stand and Double (double your bet and take exactly one card). Poker is 5-card draw with Hold toggles. This demo is single-player and client-only.</div>
+    </footer>
+  </div>
+
+  <script>
+    // Shared utilities: deck, shuffle, card DOM
+    const SUITS = ['♠','♥','♦','♣'];
+    const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+    function createDeck(){
+      const deck = [];
+      for(const s of SUITS){
+        for(const r of RANKS){
+          deck.push({rank:r,suit:s,code:r+s});
+        }
+      }
+      return deck;
+    }
+    function shuffle(deck){
+      for(let i=deck.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]];
+      }
+      return deck;
+    }
+
+    function cardEl(card,opts={}){
+      const el = document.createElement('div');
+      el.className = 'card';
+      if(opts.back) { el.classList.add('back'); el.textContent='★'; return el; }
+      if(card.suit === '♥' || card.suit==='♦') el.classList.add('red');
+      const top = document.createElement('div'); top.className='top'; top.textContent=card.rank+card.suit;
+      const center = document.createElement('div'); center.className='center'; center.textContent=card.suit;
+      const bottom = document.createElement('div'); bottom.className='bottom'; bottom.textContent=card.rank;
+      el.appendChild(top); el.appendChild(center); el.appendChild(bottom);
+      return el;
+    }
+
+    // Balance
+    let balance = 1000; const balanceEl=document.getElementById('balance'); const currentBetEl=document.getElementById('currentBet');
+    function setBalance(v){balance=v;balanceEl.textContent=v}
+    setBalance(balance);
+
+    // Tabs
+    document.querySelectorAll('button.tab').forEach(b=>b.addEventListener('click',()=>{
+      document.querySelectorAll('button.tab').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.querySelectorAll('main .table').forEach(s=>s.style.display='none');
+      document.getElementById(b.dataset.target).style.display='block';
+    }))
+
+    // --- BLACKJACK ---
+    const bj = {deck:[],dealer:[],player:[],bet:10,inPlay:false,canDouble:false};
+    const dealerHandEl = document.getElementById('dealer-hand');
+    const playerHandEl = document.getElementById('player-hand');
+    const bjStatus = document.getElementById('bj-status');
+    const playerValueEl = document.getElementById('player-value');
+    document.getElementById('bj-bet').addEventListener('change',e=>bj.bet=Math.max(1,Math.floor(Number(e.target.value)||1)));
+    document.getElementById('bj-deal').addEventListener('click',bjDeal);
+    document.getElementById('bj-hit').addEventListener('click',bjHit);
+    document.getElementById('bj-stand').addEventListener('click',bjStand);
+    document.getElementById('bj-double').addEventListener('click',bjDouble);
+
+    function bjDeal(){
+      if(bj.inPlay){bjStatus.textContent='Finish current hand first.';return}
+      const bet = bj.bet || Number(document.getElementById('bj-bet').value)||10;
+      if(bet>balance){bjStatus.textContent='Not enough balance for that bet.';return}
+      bj.bet=bet; currentBetEl.textContent=bj.bet;
+      balance-=bj.bet; setBalance(balance);
+      bj.deck = shuffle(createDeck()); bj.dealer=[]; bj.player=[]; bj.inPlay=true; bj.canDouble=true;
+      // Deal: player, dealer, player, dealer
+      bj.player.push(bj.deck.pop(),bj.deck.pop()); bj.dealer.push(bj.deck.pop(),bj.deck.pop());
+      renderBJ();
+      bjStatus.textContent='Playing...';
+      enableBJControls(true);
+      // Check immediate blackjack
+      const pv = valueOf(bj.player); const dv = valueOf([bj.dealer[0]]);
+      if(pv===21){ // player blackjack
+        finalizeBJ();
+      }
+    }
+
+    function enableBJControls(enabled){
+      document.getElementById('bj-hit').disabled = !enabled;
+      document.getElementById('bj-stand').disabled = !enabled;
+      document.getElementById('bj-double').disabled = !enabled;
+    }
+
+    function bjHit(){
+      if(!bj.inPlay) return; bj.player.push(bj.deck.pop()); bj.canDouble=false; renderBJ();
+      const pv=valueOf(bj.player); if(pv>21){bjStatus.textContent='Busted!'; finalizeBJ();}
+    }
+
+    function bjStand(){ if(!bj.inPlay) return; dealerPlay(); finalizeBJ(); }
+
+    function bjDouble(){
+      if(!bj.inPlay || !bj.canDouble) return; // allow double only as first move
+      if(bj.bet>balance){bjStatus.textContent='Not enough balance to double.';return}
+      balance-=bj.bet; bj.bet*=2; setBalance(balance); currentBetEl.textContent=bj.bet; bj.player.push(bj.deck.pop()); bj.canDouble=false; renderBJ(); const pv=valueOf(bj.player); if(pv>21){bjStatus.textContent='Busted!'; finalizeBJ();} else {dealerPlay(); finalizeBJ();}
+    }
+
+    function dealerPlay(){
+      // reveal dealer and hit until 17
+      while(valueOf(bj.dealer)<17){ bj.dealer.push(bj.deck.pop()); }
+    }
+
+    function finalizeBJ(){
+      bj.inPlay=false; enableBJControls(false);
+      renderBJ(true);
+      const pv=valueOf(bj.player); const dv=valueOf(bj.dealer);
+      let msg=''; let payout=0;
+      if(pv>21){ msg='You busted.'; payout=0; }
+      else if(dv>21){ msg='Dealer busted — you win!'; payout=bj.bet*2; }
+      else if(pv===21 && bj.player.length===2 && !(valueOf(bj.dealer)===21 && bj.dealer.length===2)){ // player blackjack
+        msg='Blackjack! Payout 3:2'; payout=Math.floor(bj.bet*2.5); }
+      else if(pv>dv){ msg='You win!'; payout=bj.bet*2; }
+      else if(pv===dv){ msg='Push — bet returned.'; payout=bj.bet; }
+      else { msg='Dealer wins.'; payout=0; }
+      balance += payout; setBalance(balance);
+      bjStatus.textContent=msg + (payout?(' (you got '+payout+' chips)'):'');
+      // reset bet display to default
+      currentBetEl.textContent=bj.bet;
+    }
+
+    function renderBJ(revealDealer=false){
+      dealerHandEl.innerHTML=''; playerHandEl.innerHTML='';
+      bj.dealer.forEach((c,i)=>{
+        const back = (i===0 && !revealDealer && bj.inPlay);
+        dealerHandEl.appendChild(cardEl(c,{back}));
+      });
+      bj.player.forEach(c=>playerHandEl.appendChild(cardEl(c)));
+      playerValueEl.textContent = valueOf(bj.player);
+    }
+
+    function valueOf(cards){
+      // blackjack value (A as 1 or 11)
+      let total=0; let aces=0;
+      for(const c of cards){
+        if(c.rank==='A'){aces++; total+=11}
+        else if(['J','Q','K'].includes(c.rank)) total+=10;
+        else total+=Number(c.rank);
+      }
+      while(total>21 && aces>0){ total-=10; aces--; }
+      return total;
+    }
+
+    // --- POKER (5-card draw simplified, single-player video-poker style) ---
+    const pkr = {deck:[],hand:[],bet:5,inPlay:false,holds:[0,0,0]};
+    const pkrHandEl = document.getElementById('pkr-hand');
+    const pkrResult = document.getElementById('pkr-result');
+    document.getElementById('pkr-bet').addEventListener('change',e=>pkr.bet=Math.max(1,Math.floor(Number(e.target.value)||1)));
+    document.getElementById('pkr-deal').addEventListener('click',pkrDeal);
+    document.getElementById('pkr-draw').addEventListener('click',pkrDraw);
+
+    function pkrDeal(){
+      if(pkr.inPlay){pkrResult.textContent='Finish current hand first.';return}
+      const bet = pkr.bet || Number(document.getElementById('pkr-bet').value)||5;
+      if(bet>balance){pkrResult.textContent='Not enough chips.';return}
+      pkr.bet=bet; balance-=pkr.bet; setBalance(balance); currentBetEl.textContent=pkr.bet;
+      pkr.deck = shuffle(createDeck()); pkr.hand = [pkr.deck.pop(),pkr.deck.pop(),pkr.deck.pop(),pkr.deck.pop(),pkr.deck.pop()];
+      pkr.inPlay=true; pkr.holds=[0,0,0,0,0]; renderPkr(); document.getElementById('pkr-draw').disabled=false; pkrResult.textContent='Choose holds then Draw.';
+    }
+
+    function renderPkr(){ pkrHandEl.innerHTML=''; pkr.hand.forEach((c,i)=>{
+      const wrap = document.createElement('div'); wrap.style.display='flex'; wrap.style.flexDirection='column'; wrap.style.alignItems='center';
+      wrap.appendChild(cardEl(c));
+      const hold = document.createElement('button'); hold.className='hold'; hold.textContent=pkr.holds[i]?'HELD':'Hold'; if(pkr.holds[i]) hold.classList.add('active');
+      hold.addEventListener('click',()=>{ if(!pkr.inPlay) return; pkr.holds[i]=pkr.holds[i]?0:1; renderPkr(); });
+      wrap.appendChild(hold); pkrHandEl.appendChild(wrap);
+    }) }
+
+    function pkrDraw(){
+      if(!pkr.inPlay) return; // replace non-held cards
+      for(let i=0;i<5;i++){
+        if(!pkr.holds[i]) pkr.hand[i]=pkr.deck.pop();
+      }
+      document.getElementById('pkr-draw').disabled=true; pkr.inPlay=false;
+      const result = evaluatePokerHand(pkr.hand);
+      const payout = payoutFor(result,pkr.bet);
+      balance += payout; setBalance(balance);
+      pkrResult.textContent = result + (payout?(' — You won '+payout+' chips!'):' — No payout.');
+      renderPkr();
+    }
+
+    function evaluatePokerHand(hand){
+      // returns a string rank
+      // convert to counts and sorted ranks (A high)
+      const ranks = hand.map(c=>c.rank);
+      const suitSet = new Set(hand.map(c=>c.suit));
+      const counts = {};
+      const rankOrder = {'A':14,'K':13,'Q':12,'J':11,'10':10,'9':9,'8':8,'7':7,'6':6,'5':5,'4':4,'3':3,'2':2};
+      const nums = hand.map(c=>rankOrder[c.rank]).sort((a,b)=>a-b);
+      for(const r of ranks) counts[r]=(counts[r]||0)+1;
+      const countsArr = Object.values(counts).sort((a,b)=>b-a);
+      const isFlush = suitSet.size===1;
+      const isStraight = (nums[4]-nums[0]===4 && new Set(nums).size===5) || // normal straight
+        (JSON.stringify(nums)==='[2,3,4,5,14]'); // wheel A-2-3-4-5
+
+      if(isStraight && isFlush && nums.includes(14) && nums.includes(10)) return 'Royal Flush';
+      if(isStraight && isFlush) return 'Straight Flush';
+      if(countsArr[0]===4) return 'Four of a Kind';
+      if(countsArr[0]===3 && countsArr[1]===2) return 'Full House';
+      if(isFlush) return 'Flush';
+      if(isStraight) return 'Straight';
+      if(countsArr[0]===3) return 'Three of a Kind';
+      if(countsArr[0]===2 && countsArr[1]===2) return 'Two Pair';
+      if(countsArr[0]===2){
+        // pair — check Jacks or better
+        const pairRank = Object.keys(counts).find(k=>counts[k]===2);
+        const good = ['J','Q','K','A','10']; // treat 10+ as Jacks or better variant
+        if(good.includes(pairRank)) return 'Pair (Jacks or better)';
+      }
+      return 'No Winner';
+    }
+
+    function payoutFor(rank,bet){
+      const table = {
+        'Royal Flush':250,
+        'Straight Flush':50,
+        'Four of a Kind':25,
+        'Full House':9,
+        'Flush':6,
+        'Straight':4,
+        'Three of a Kind':3,
+        'Two Pair':2,
+        'Pair (Jacks or better)':1,
+      };
+      if(!table[rank]) return 0; return table[rank]*bet;
+    }
+
+    // initialize small default render
+    renderBJ(); renderPkr();
+
+    // Expose quick keyboard shortcuts for convenience (optional)
+    document.addEventListener('keydown',e=>{
+      if(e.key==='h') document.getElementById('bj-hit').click();
+      if(e.key==='s') document.getElementById('bj-stand').click();
+      if(e.key==='d') document.getElementById('bj-double').click();
+    });
+  </script>
+</body>
+</html>
